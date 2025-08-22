@@ -27,6 +27,28 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+# ---- Log DB fonksiyonu ----
+def log_to_db(level: str, message: str):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO logs (level, message) VALUES (?, ?)",
+            (level, message)
+        )
+        conn.commit()
+
+def app_log(level: str, message: str):
+    if level == "info":
+        logger.info(message)
+    elif level == "warning":
+        logger.warning(message)
+    elif level == "error":
+        logger.error(message)
+    else:
+        logger.debug(message)
+
+    log_to_db(level, message)
+
 # ---- Tabloları oluştur ----
 with get_db() as conn:
     # Category tablosu
@@ -46,6 +68,15 @@ with get_db() as conn:
             FOREIGN KEY (category_id) REFERENCES categories (id)
         )
     """)
+    # Logs tablosu
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT,
+            message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
 
 
@@ -59,7 +90,7 @@ def get_categories():
         cursor = conn.cursor()
         cursor.execute("SELECT id, name FROM categories")
         rows = cursor.fetchall()
-    logger.info("Tüm kategoriler getirildi")
+    app_log("info", "Tüm kategoriler getirildi")
     return [dict(row) for row in rows]
 
 @app.get("/categories/{category_id}")
@@ -69,9 +100,9 @@ def get_category(category_id: int):
         cursor.execute("SELECT id, name FROM categories WHERE id = ?", (category_id,))
         row = cursor.fetchone()
     if row:
-        logger.info(f"Kategori getirildi: id={category_id}")
+        app_log("info", f"Kategori getirildi: id={category_id}")
         return dict(row)
-    logger.warning(f"Kategori bulunamadı: id={category_id}")
+    app_log("warning", f"Kategori bulunamadı: id={category_id}")
     return {"error": f"Category {category_id} not found"}
 
 @app.post("/categories")
@@ -82,10 +113,10 @@ def add_category(category: Category):
             cursor.execute("INSERT INTO categories (name) VALUES (?)", (category.name,))
             conn.commit()
             new_id = cursor.lastrowid
-            logger.info(f"Kategori eklendi: {category.name} (id={new_id})")
+            app_log("info", f"Kategori eklendi: {category.name} (id={new_id})")
             return {"id": new_id, "name": category.name}
         except sqlite3.IntegrityError:
-            logger.warning(f"Kategori zaten mevcut: {category.name}")
+            app_log("warning", f"Kategori zaten mevcut: {category.name}")
             return {"error": "Bu kategori zaten mevcut"}
 
 @app.put("/categories/{category_id}")
@@ -95,9 +126,9 @@ def update_category(category_id: int, category: Category):
         cursor.execute("UPDATE categories SET name = ? WHERE id = ?", (category.name, category_id))
         conn.commit()
         if cursor.rowcount == 0:
-            logger.warning(f"Güncellenmek istenen kategori bulunamadı: id={category_id}")
+            app_log("warning", f"Güncellenmek istenen kategori bulunamadı: id={category_id}")
             return {"error": f"Category {category_id} not found"}
-    logger.info(f"Kategori güncellendi: id={category_id}, yeni ad={category.name}")
+    app_log("info", f"Kategori güncellendi: id={category_id}, yeni ad={category.name}")
     return {"id": category_id, "name": category.name}
 
 @app.delete("/categories/{category_id}")
@@ -107,9 +138,9 @@ def delete_category(category_id: int):
         cursor.execute("DELETE FROM categories WHERE id = ?", (category_id,))
         conn.commit()
         if cursor.rowcount == 0:
-            logger.warning(f"Silinmek istenen kategori bulunamadı: id={category_id}")
+            app_log("warning", f"Silinmek istenen kategori bulunamadı: id={category_id}")
             return {"error": f"Category {category_id} not found"}
-    logger.info(f"Kategori silindi: id={category_id}")
+    app_log("info", f"Kategori silindi: id={category_id}")
     return {"message": f"Category {category_id} deleted"}
 
 
@@ -127,7 +158,7 @@ def get_blocks():
             JOIN categories c ON b.category_id = c.id
         """)
         rows = cursor.fetchall()
-    logger.info("Tüm bloklar getirildi")
+    app_log("info", "Tüm bloklar getirildi")
     return [dict(row) for row in rows]
 
 @app.post("/blocks")
@@ -137,7 +168,7 @@ def add_block(block: Block):
         cursor.execute("SELECT id FROM categories WHERE id = ?", (block.category_id,))
         category = cursor.fetchone()
         if not category:
-            logger.warning(f"Geçersiz kategori id ile blok ekleme denemesi: {block.category_id}")
+            app_log("warning", f"Geçersiz kategori id ile blok ekleme denemesi: {block.category_id}")
             return {"error": "Geçersiz kategori id"}
 
         cursor.execute(
@@ -146,7 +177,7 @@ def add_block(block: Block):
         )
         conn.commit()
         new_id = cursor.lastrowid
-    logger.info(f"Blok eklendi: id={new_id}, kategori={block.category_id}, başlık={block.title}")
+    app_log("info", f"Blok eklendi: id={new_id}, kategori={block.category_id}, başlık={block.title}")
     return {
         "id": new_id,
         "category_id": block.category_id,
@@ -164,9 +195,9 @@ def update_block(block_id: int, block: Block):
         )
         conn.commit()
         if cursor.rowcount == 0:
-            logger.warning(f"Güncellenmek istenen blok bulunamadı: id={block_id}")
+            app_log("warning", f"Güncellenmek istenen blok bulunamadı: id={block_id}")
             return {"error": f"Block {block_id} not found"}
-    logger.info(f"Blok güncellendi: id={block_id}, kategori={block.category_id}, başlık={block.title}")
+    app_log("info", f"Blok güncellendi: id={block_id}, kategori={block.category_id}, başlık={block.title}")
     return {
         "id": block_id,
         "category_id": block.category_id,
@@ -181,7 +212,19 @@ def delete_block(block_id: int):
         cursor.execute("DELETE FROM blocks WHERE id = ?", (block_id,))
         conn.commit()
         if cursor.rowcount == 0:
-            logger.warning(f"Silinmek istenen blok bulunamadı: id={block_id}")
+            app_log("warning", f"Silinmek istenen blok bulunamadı: id={block_id}")
             return {"error": f"Block {block_id} not found"}
-    logger.info(f"Blok silindi: id={block_id}")
+    app_log("info", f"Blok silindi: id={block_id}")
     return {"message": f"Block {block_id} deleted"}
+
+
+# ==========================
+# LOGS
+# ==========================
+@app.get("/logs")
+def get_logs():
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, level, message, created_at FROM logs ORDER BY created_at DESC")
+        rows = cursor.fetchall()
+    return [dict(row) for row in rows]
