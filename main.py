@@ -177,7 +177,7 @@ def add_block(block: Block):
         )
         conn.commit()
         new_id = cursor.lastrowid
-    app_log("info", f"Blok eklendi: id={new_id}, kategori={block.category_id}, başlık={block.title}, content={block.content}")
+    app_log("info", f"Blok eklendi: id={new_id}, kategori={block.category_id}, başlık={block.title}, içerik={block.content}")
     return {
         "id": new_id,
         "category_id": block.category_id,
@@ -197,7 +197,7 @@ def update_block(block_id: int, block: Block):
         if cursor.rowcount == 0:
             app_log("warning", f"Güncellenmek istenen blok bulunamadı: id={block_id}")
             return {"error": f"Block {block_id} not found"}
-    app_log("info", f"Blok güncellendi: id={block_id}, kategori={block.category_id}, başlık={block.title}")
+    app_log("info", f"Blok güncellendi: id={block_id}, kategori={block.category_id}, başlık={block.title}, içerik={block.content}")
     return {
         "id": block_id,
         "category_id": block.category_id,
