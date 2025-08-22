@@ -177,7 +177,7 @@ def add_block(block: Block):
         )
         conn.commit()
         new_id = cursor.lastrowid
-    app_log("info", f"Blok eklendi: id={new_id}, kategori={block.category_id}, başlık={block.title}")
+    app_log("info", f"Blok eklendi: id={new_id}, kategori={block.category_id}, başlık={block.title}, content={block.content}")
     return {
         "id": new_id,
         "category_id": block.category_id,
